@@ -3,5 +3,6 @@ applications:
   host: pzsvc-hello-cli
   command: chmod 755 ./pz-flex && ./pz-flex
   memory: 512M
+  buildpack: binary_buildpack
   instances: 1
   timeout: 180
