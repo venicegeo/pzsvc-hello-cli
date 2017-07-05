@@ -92,7 +92,7 @@ func hello(method string) {
 		values := endpoints["hello"].Values
 		name := values["name"]
 		count := values["count"]
-		exit.Failure(`{"greeting":"Hello, %s!","countSquared":%d}`, name.(string), count.(int)*count.(int))
+		exit.Failure(`{"greeting":"Hello, %s!","countSquared":%d}`, strings.Replace(name.(string), `"`, ``, -1), count.(int)*count.(int))
 	default:
 		exit.Failure("Bad method")
 	}
