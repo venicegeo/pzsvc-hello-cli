@@ -104,7 +104,7 @@ func lightning(method string) {
 		if !strike {
 			exit.Success(`{"strike":false,"lat":0.0,"lon":0.0}`)
 		}
-		exit.Success(`{"strike":true,"lat":%.3f,:"lon":%.3f}`, (rand.Float32()*180.0)-90.0, (rand.Float32()*360.0)-180.0)
+		exit.Success(`{"strike":true,"lat":%.3f,"lon":%.3f}`, (rand.Float32()*180.0)-90.0, (rand.Float32()*360.0)-180.0)
 	default:
 		exit.Failure("Bad method")
 	}
