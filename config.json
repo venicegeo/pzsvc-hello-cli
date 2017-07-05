@@ -1,11 +1,17 @@
 {
 	"cmd":"./pzsvc-hello-cli",
+	"includeRouteData": true,
 	"routing": {
 		"hello": {
 			"GET": {},
 			"POST":{
-				"name":"",
-				"count":0
+				"_user": {
+					"name":"",
+					"count":0
+				},
+				"_static": {
+					"dork":""
+				}
 			}
 		},
 		"lightning":{
