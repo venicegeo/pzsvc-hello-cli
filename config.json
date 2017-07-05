@@ -1,5 +1,5 @@
 {
-	"cmd":"svc",
+	"cmd":"pzsvc-hello-cli",
 	"routing": {
 		"hello": {
 			"GET": {},
