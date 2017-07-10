@@ -1,0 +1,102 @@
+#!/usr/bin/groovy
+
+node {
+    def root = pwd()
+    def mvn = tool 'M3'
+    def golangTool = tool 'golang_1.7'
+    def zapHome = tool 'ZAProxy_v2_5_0'
+    def nodejs = tool 'NodeJS_6'
+    stage("Setup") {
+        deleteDir()
+        withEnv([
+          "PATH+=${golangTool}/bin:${root}/gopath/bin",
+          "GOROOT=${golangTool}",
+          "GOPATH=${root}/gopath"
+        ]) {
+            sh """
+              mkdir -p ${root}/gopath/bin ${root}/gopath/pkg ${root}/gopath/src
+              go version
+              mkdir -p ${root}/gopath/src/github.com/venicegeo/pz-flex
+              mkdir -p ${root}/gopath/src/github.com/venicegeo/pzsvc-hello-cli
+            """
+        }
+        dir("${root}/gopath/src/github.com/venicegeo/pz-flex") {
+            git url: "https://github.com/venicegeo/pz-flex", branch: "master"
+        }
+        dir("${root}/gopath/src/github.com/venicegeo/pzsvc-hello-cli") {
+            git url: "https://github.com/venicegeo/pzsvc-hello-cli", branch: "master"
+        }
+    }
+    def appvers = sh(script: """git describe --long --tags --always | sed 's/\\./-/'g""", returnStdout: true)
+    appvers = appvers.trim()
+    def appName = "pzsvc-cli-hello"
+
+    stage("Build") {
+        withEnv([
+          "PATH+=${golangTool}/bin:${root}/gopath/bin",
+          "GOROOT=${golangTool}",
+          "GOPATH=${root}/gopath"
+        ]) {
+            sh """
+              cd ${root}/gopath/src/github.com/venicegeo/
+              cd ${root}/gopath/src/github.com/venicegeo/pzsvc-hello-cli
+              go build
+              cd ../pz-flex
+              go build
+              cd ..
+              cp pzsvc-hello-cli/pzsvc-hello-cli ${root}/
+              cp pzsvc-hello-cli/config.json ${root}/
+              cp pzsvc-hello-cli/manifest.jenkins.yml ${root}/
+              cp pz-flex/pz-flex ${root}/
+            """
+        }
+    }
+    def archiveName = "pzsvc-cli-hello.tgz"
+    stage("Archive") {
+        sh "tar -cvzf ${archiveName} pzsvc-hello-cli pz-flex config.json manifest.jenkins.yml"
+        sh "tar -tvf ${archiveName}"
+    }
+    stage("CF Deploy") {
+        if(!fileExists('.cf')) {
+            sh "mkdir -p .cf"
+        }
+        withEnv([
+          "CF_HOME=.cf"
+        ]) {
+            withCredentials([
+              [$class: 'UsernamePasswordMultiBinding', credentialsId: "${env.PCF_CREDS}", usernameVariable: "CFUSER", passwordVariable: "CFPASS"]
+            ]) {
+                sh """
+                  echo $PWD
+                  mkdir -p workspace/venice/pz-flex-snowflake
+                  tar -xzvf ${archiveName} -C workspace/venice/pz-flex-snowflake/
+                """
+                sh """
+                  cf api ${env.PCF_API_ENDPOINT}
+                  cf auth ${CFUSER} ${CFPASS}
+                  cf target -o ${env.PCF_ORG} -s ${env.PHASE_ONE_PCF_SPACE}
+                  cf push ${appName} -f manifest.jenkins.yml --hostname ${appName} -d ${env.PHASE_ONE_PCF_DOMAIN} --no-start -u none
+                  cf set-env ${appName} SPACE ${env.PHASE_ONE_PCF_SPACE}
+                  cf set-env ${appName} DOMAIN ${env.PHASE_ONE_PCF_DOMAIN}
+                  cf restage ${appName}
+                """
+                def legacyAppNames = sh(script: """cf routes | grep \"pzsvc-cli-hello \" | awk '{print \$4}'""", returnStdout: true)
+                sh "cf map-route ${appName} ${env.PHASE_ONE_PCF_DOMAIN} --hostname pzsvc-cli-hello"
+                // Remove legacy applications
+                for (Object legacyApp : legacyAppNames.trim().tokenize(',')) {
+                    def legacyAppName = legacyApp.toString().trim()
+                    if(legacyAppName != appName) {
+                        sh "cf unmap-route ${legacyAppName} ${env.PHASE_ONE_PCF_DOMAIN} --hostname ${legacyAppName}"
+                        sh "cf delete -f ${legacyAppName}"
+                    }
+                }
+                try {
+                  sh "cf start ${appName}"
+                } catch (Exception e) {
+                  sh "cf delete ${appName} -f"
+                  error("Error during application start. Deleting ${appName} and failing the build.")
+                }
+            }
+        }
+    }
+}
