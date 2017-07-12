@@ -1,4 +1,5 @@
 {
+	"port": 9600,
 	"cmd":"./pzsvc-hello-cli",
 	"includeRouteData": true,
 	"routing": {
