@@ -6,13 +6,8 @@
 		"hello": {
 			"GET": {},
 			"POST":{
-				"_user": {
-					"name":"",
-					"count":0
-				},
-				"_static": {
-					"dork":""
-				}
+				"name":"",
+				"count":0
 			}
 		},
 		"lightning":{
